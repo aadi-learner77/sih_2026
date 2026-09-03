@@ -1,0 +1,10 @@
+{
+  "description": "Monitor Automatic Weather Stations in real-time, detect anomalies, and visualize data trends with an interactive dashboard for enhanced decision-making.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

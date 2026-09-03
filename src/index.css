@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  background: #060A14;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  color: #C8D8F0;
+}
+
+.font-display { font-family: 'Space Grotesk', sans-serif; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.25); border-radius: 2px; }
+* { scrollbar-width: thin; scrollbar-color: rgba(0,212,255,0.25) transparent; }
+
+/* Glass panels */
+.glass {
+  background: rgba(6,14,30,0.72);
+  backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid rgba(0,212,255,0.13);
+}
+.glass-amber {
+  background: rgba(18,12,0,0.75);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,184,0,0.22);
+}
+.glass-red {
+  background: rgba(18,4,8,0.75);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,59,92,0.22);
+}
+.glass-green {
+  background: rgba(0,12,8,0.75);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(0,255,163,0.22);
+}
+
+/* Animated background grid */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0,212,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  animation: grid-drift 24s linear infinite;
+}
+@keyframes grid-drift {
+  0% { background-position: 0 0; }
+  100% { background-position: 44px 44px; }
+}
+
+/* Radar sweep */
+.radar-sweep {
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    rgba(0,212,255,0.10) 22deg,
+    rgba(0,212,255,0.04) 45deg,
+    transparent 60deg
+  );
+  border-radius: 50%;
+  animation: radar-spin 5s linear infinite;
+  pointer-events: none;
+}
+@keyframes radar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Pin pulse rings */
+@keyframes pin-ring {
+  0% { transform: scale(0.8); opacity: 0.9; }
+  70% { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.pin-pulse { animation: pin-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.pin-pulse-slow { animation: pin-ring 2.8s cubic-bezier(0.4, 0, 0.6, 1) infinite 0.4s; }
+
+/* Event cards slide in */
+@keyframes slide-right {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.event-enter { animation: slide-right 0.42s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* Shake on anomaly */
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  15%,45%,75% { transform: translateX(-4px) rotate(-1deg); }
+  30%,60%,90% { transform: translateX(4px) rotate(1deg); }
+}
+.shake { animation: shake 0.55s ease-in-out; }
+
+/* Number flash */
+@keyframes num-flash {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.num-flash { animation: num-flash 0.6s ease; }
+
+/* Status dot blink */
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+.blink { animation: blink 1.2s ease-in-out infinite; }
+
+/* Healing progress bar */
+@keyframes heal-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+.heal-bar { animation: heal-progress 1.5s ease-in-out forwards; }
+
+/* Glow borders */
+.glow-blue  { box-shadow: 0 0 0 1px rgba(0,212,255,0.3), 0 0 16px rgba(0,212,255,0.15); }
+.glow-amber { box-shadow: 0 0 0 1px rgba(255,184,0,0.3), 0 0 16px rgba(255,184,0,0.12); }
+.glow-red   { box-shadow: 0 0 0 1px rgba(255,59,92,0.3),  0 0 16px rgba(255,59,92,0.12); }
+.glow-green { box-shadow: 0 0 0 1px rgba(0,255,163,0.3),  0 0 16px rgba(0,255,163,0.12); }
+
+/* Scrollable list hides scrollbar until hover */
+.scroll-hide { overflow-y: scroll; }
+.scroll-hide::-webkit-scrollbar-thumb { background: transparent; }
+.scroll-hide:hover::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.25); }
