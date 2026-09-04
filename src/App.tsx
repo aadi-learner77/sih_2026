@@ -367,6 +367,15 @@ function EventCard({ event, showAiOnly }: { event: AnomalyEvent; showAiOnly: boo
           {new Date(event.timestamp).toLocaleTimeString('en-IN', { hour12: false })}
         </span>
       </div>
+
+      {/* LLM / Natural Language Explanation */}
+      {event.explanation && (
+        <div className="mt-1.5 text-xs italic font-sans px-2 py-1 rounded"
+          style={{ background: 'rgba(0,212,255,0.06)', borderLeft: `2px solid ${CLR.blue}`, color: '#E0EEFF' }}>
+          💡 {event.explanation}
+        </div>
+      )}
+
       <div className="flex items-center justify-between mt-1.5 gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {statusEl}
@@ -603,20 +612,39 @@ export default function App() {
   const [health, setHealth] = useState(100);
   const [statuses, setStatuses] = useState<Record<string, DS.StationStatus>>({});
 
-  // Main polling loop — WebSocket-equivalent simulation
-  const poll = useCallback(() => {
-    const newLatest: Record<string, Reading | null> = {};
-    const newHistory: Record<string, Reading[]> = {};
-    const newStatuses: Record<string, DS.StationStatus> = {};
-    stations.forEach(s => {
-      newLatest[s.id] = DS.getLiveReading(s.id, mode);
-      newHistory[s.id] = DS.getReadingsHistory(s.id);
-      newStatuses[s.id] = DS.getStationStatus(s.id);
-    });
-    setLatest(newLatest);
-    setHistory(newHistory);
-    setStatuses(newStatuses);
-    setHealth(DS.getNetworkHealth());
+  // Main polling loop — Fetch live state from backend API
+  const poll = useCallback(async () => {
+    try {
+      const readingPromises = stations.map(s => DS.fetchLiveReading(s.id, mode));
+      const historyPromises = stations.map(s => DS.fetchReadingsHistory(s.id));
+      const statusPromises = stations.map(s => DS.fetchStationStatus(s.id));
+
+      const [readingsRes, historiesRes, statusesRes, healthRes, eventsRes] = await Promise.all([
+        Promise.all(readingPromises),
+        Promise.all(historyPromises),
+        Promise.all(statusPromises),
+        DS.fetchNetworkHealth(),
+        DS.fetchAnomalyEvents()
+      ]);
+
+      const newLatest: Record<string, Reading | null> = {};
+      const newHistory: Record<string, Reading[]> = {};
+      const newStatuses: Record<string, DS.StationStatus> = {};
+
+      stations.forEach((s, idx) => {
+        newLatest[s.id] = readingsRes[idx];
+        newHistory[s.id] = historiesRes[idx];
+        newStatuses[s.id] = statusesRes[idx];
+      });
+
+      setLatest(newLatest);
+      setHistory(newHistory);
+      setStatuses(newStatuses);
+      setHealth(healthRes);
+      setEvents(eventsRes);
+    } catch (e) {
+      console.error('Polling error:', e);
+    }
   }, [stations, mode]);
 
   useEffect(() => {
@@ -624,12 +652,6 @@ export default function App() {
     const id = setInterval(poll, 1500);
     return () => clearInterval(id);
   }, [poll]);
-
-  // Faster event list refresh to catch healing status changes
-  useEffect(() => {
-    const id = setInterval(() => setEvents(DS.getAnomalyEvents()), 400);
-    return () => clearInterval(id);
-  }, []);
 
   // Filter events for current mode
   const visibleEvents = useMemo(

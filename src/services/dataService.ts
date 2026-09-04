@@ -39,14 +39,19 @@ export interface AnomalyEvent {
   confidence: number;
   status: 'detected' | 'healing' | 'corrected';
   aiOnly: boolean;
+  explanation?: string | null;
 }
 
 export type FaultType = 'spike' | 'flatline' | 'dropout';
 export type DetectionMode = 'rule' | 'ai';
 
-// ─── Station catalogue ────────────────────────────────────────────────────────
+// ─── API Configuration ────────────────────────────────────────────────────────
 
-const STATIONS: Station[] = [
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// ─── Fallback Static Stations (used if initial fetch fails) ───────────────────
+
+const FALLBACK_STATIONS: Station[] = [
   { id: 'DEL', name: 'AWS-DEL-01', location: 'New Delhi',           state: 'Delhi',          lat: 28.6,  lon: 77.2,  elevation: 216  },
   { id: 'MUM', name: 'AWS-MUM-07', location: 'Mumbai',              state: 'Maharashtra',    lat: 19.1,  lon: 72.9,  elevation: 14   },
   { id: 'CHN', name: 'AWS-CHN-03', location: 'Chennai',             state: 'Tamil Nadu',     lat: 13.1,  lon: 80.3,  elevation: 6    },
@@ -64,212 +69,135 @@ const STATIONS: Station[] = [
   { id: 'SXR', name: 'AWS-SXR-14', location: 'Srinagar',            state: 'J&K',            lat: 34.1,  lon: 74.8,  elevation: 1587 },
 ];
 
-// Realistic base values per station
-const BASE: Record<string, { temp: number; pressure: number; humidity: number; wind: number }> = {
-  DEL: { temp: 34.2, pressure: 1009, humidity: 45, wind: 4.2 },
-  MUM: { temp: 31.4, pressure: 1013, humidity: 78, wind: 6.8 },
-  CHN: { temp: 33.1, pressure: 1011, humidity: 72, wind: 5.1 },
-  KOL: { temp: 30.6, pressure: 1010, humidity: 80, wind: 3.7 },
-  BLR: { temp: 26.3, pressure: 921,  humidity: 60, wind: 3.2 },
-  HYD: { temp: 29.8, pressure: 960,  humidity: 55, wind: 4.5 },
-  AMD: { temp: 35.7, pressure: 1007, humidity: 35, wind: 7.3 },
-  JAI: { temp: 36.4, pressure: 992,  humidity: 30, wind: 8.1 },
-  LKO: { temp: 32.5, pressure: 1005, humidity: 50, wind: 3.9 },
-  BHO: { temp: 30.1, pressure: 965,  humidity: 52, wind: 4.0 },
-  PAT: { temp: 31.2, pressure: 1008, humidity: 68, wind: 3.4 },
-  GUW: { temp: 28.4, pressure: 1012, humidity: 85, wind: 5.5 },
-  PUN: { temp: 28.9, pressure: 956,  humidity: 58, wind: 4.7 },
-  TVM: { temp: 30.5, pressure: 1014, humidity: 82, wind: 7.2 },
-  SXR: { temp: 18.2, pressure: 852,  humidity: 40, wind: 6.5 },
-};
+// In-memory cache for latest readings to support synchronous getLatestReading calls
+const latestReadingsCache = new Map<string, Reading>();
 
-// ─── Internal state ───────────────────────────────────────────────────────────
+// ─── API Methods with fetch() ─────────────────────────────────────────────────
 
-interface ActiveFault { type: FaultType; startTime: number; duration: number }
-const activeFaults = new Map<string, ActiveFault>();
-const readingsHistory = new Map<string, Reading[]>();
-const latestReadings = new Map<string, Reading>();
-let anomalyEvents: AnomalyEvent[] = [];
-let eventIdCounter = 0;
-
-STATIONS.forEach(s => readingsHistory.set(s.id, []));
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function noise(amp: number) { return (Math.random() - 0.5) * 2 * amp; }
-
-function setEventStatus(id: string, status: AnomalyEvent['status']) {
-  anomalyEvents = anomalyEvents.map(e => e.id === id ? { ...e, status } : e);
+export async function fetchStationList(): Promise<Station[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/stations`);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch station list from backend:', err);
+    return FALLBACK_STATIONS;
+  }
 }
 
-function pushEvent(reading: Reading, stationName: string) {
-  if (!reading.isAnomaly || !reading.anomalyType || !reading.anomalyParameter) return;
-
-  const param = reading.anomalyParameter;
-  const raw = param === 'temperature' ? reading.temperature
-    : param === 'pressure' ? reading.pressure : reading.humidity;
-
-  const event: AnomalyEvent = {
-    id: `evt-${++eventIdCounter}-${Date.now()}`,
-    stationId: reading.stationId,
-    stationName,
-    timestamp: reading.timestamp,
-    parameter: param,
-    anomalyType: reading.anomalyType,
-    rawValue: raw,
-    correctedValue: reading.correctedValue,
-    confidence: reading.confidence,
-    status: 'detected',
-    aiOnly: reading.aiOnly,
-  };
-  anomalyEvents = [event, ...anomalyEvents].slice(0, 60);
-
-  setTimeout(() => setEventStatus(event.id, 'healing'), 900 + Math.random() * 300);
-  setTimeout(() => setEventStatus(event.id, 'corrected'), 2400 + Math.random() * 600);
+export function getStationList(): Station[] {
+  return FALLBACK_STATIONS;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-export function getStationList(): Station[] { return STATIONS; }
+export async function fetchLiveReading(stationId: string, mode: DetectionMode): Promise<Reading | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/stations/${stationId}/reading?mode=${mode}`);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    const reading: Reading = await res.json();
+    latestReadingsCache.set(stationId, reading);
+    return reading;
+  } catch (err) {
+    console.error(`Failed to fetch live reading for station ${stationId}:`, err);
+    return null;
+  }
+}
 
 export function getLiveReading(stationId: string, mode: DetectionMode): Reading {
-  const base = BASE[stationId];
-  const fault = activeFaults.get(stationId);
-  const now = Date.now();
+  // Synchronous shim that triggers the fetch in the background and returns cached value or safe fallback
+  fetchLiveReading(stationId, mode).catch(() => {});
+  const cached = latestReadingsCache.get(stationId);
+  if (cached) return cached;
 
-  // Expire old faults
-  if (fault && now - fault.startTime > fault.duration) {
-    activeFaults.delete(stationId);
-  }
-
-  const activeFault = activeFaults.get(stationId);
-
-  let temp = base.temp + noise(1.4);
-  let pressure = base.pressure + noise(1.8);
-  let humidity = base.humidity + noise(2.5);
-  const windSpeed = Math.max(0, base.wind + noise(0.9));
-
-  if (activeFault) {
-    switch (activeFault.type) {
-      case 'spike':
-        temp = base.temp + 16 + Math.random() * 6;
-        break;
-      case 'flatline':
-        // Pressure locked to a flat value inside normal band — rule misses this
-        pressure = base.pressure + 0.8;
-        break;
-      case 'dropout':
-        temp = 0; pressure = 0; humidity = 0;
-        break;
-    }
-  }
-
-  // ── Anomaly detection ──────────────────────────────────────────
-  let isAnomaly = false;
-  let anomalyType: Reading['anomalyType'] = null;
-  let anomalyParameter: Reading['anomalyParameter'] = null;
-  let confidence = 0;
-  let correctedValue: number | null = null;
-  let aiOnly = false;
-
-  if (activeFault?.type === 'dropout') {
-    isAnomaly = true;
-    anomalyType = 'dropout';
-    anomalyParameter = 'temperature';
-    confidence = 0.99;
-    aiOnly = false;
-  } else if (activeFault?.type === 'spike') {
-    isAnomaly = true;
-    anomalyType = 'spike';
-    anomalyParameter = 'temperature';
-    confidence = mode === 'ai' ? 0.97 : 0.88;
-    correctedValue = +(base.temp + noise(1.2)).toFixed(1);
-    aiOnly = false;
-  } else if (activeFault?.type === 'flatline') {
-    // Rule-based: pressure is inside normal range, so rule MISSES it
-    // AI: detects zero-variance pattern
-    if (mode === 'ai') {
-      isAnomaly = true;
-      anomalyType = 'flatline';
-      anomalyParameter = 'pressure';
-      confidence = 0.84 + Math.random() * 0.08;
-      correctedValue = +(base.pressure + noise(1.5)).toFixed(1);
-      aiOnly = true;
-    }
-  } else {
-    // Occasional natural drift that only AI catches
-    const history = readingsHistory.get(stationId) || [];
-    if (history.length >= 6 && mode === 'ai') {
-      const recent = history.slice(-6).map(r => r.temperature);
-      const trend = recent[5] - recent[0];
-      if (Math.abs(trend) > 5) {
-        isAnomaly = true;
-        anomalyType = 'drift';
-        anomalyParameter = 'temperature';
-        confidence = 0.68 + Math.random() * 0.14;
-        correctedValue = +(base.temp + noise(1.5)).toFixed(1);
-        aiOnly = true;
-      }
-    }
-  }
-
-  const reading: Reading = {
+  return {
     stationId,
-    timestamp: now,
-    temperature: +temp.toFixed(1),
-    pressure:    +pressure.toFixed(1),
-    humidity:    +humidity.toFixed(1),
-    windSpeed:   +windSpeed.toFixed(1),
-    isAnomaly, anomalyType, anomalyParameter,
-    confidence, correctedValue, aiOnly,
+    timestamp: Date.now(),
+    temperature: 30.0,
+    pressure: 1000.0,
+    humidity: 50.0,
+    windSpeed: 5.0,
+    isAnomaly: false,
+    anomalyType: null,
+    anomalyParameter: null,
+    confidence: 0,
+    correctedValue: null,
+    aiOnly: false
   };
+}
 
-  // Update history (last 60)
-  const hist = readingsHistory.get(stationId)!;
-  hist.push(reading);
-  if (hist.length > 60) hist.shift();
-  latestReadings.set(stationId, reading);
-
-  // Fire event (rate-limit: only if last event was > 3 s ago)
-  if (reading.isAnomaly) {
-    const lastEvt = anomalyEvents.find(e => e.stationId === stationId && e.status !== 'corrected');
-    if (!lastEvt || now - lastEvt.timestamp > 3000) {
-      const station = STATIONS.find(s => s.id === stationId)!;
-      pushEvent(reading, station.name);
-    }
+export async function fetchReadingsHistory(stationId: string): Promise<Reading[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/stations/${stationId}/history`);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error(`Failed to fetch history for station ${stationId}:`, err);
+    return [];
   }
-
-  return reading;
 }
 
 export function getReadingsHistory(stationId: string): Reading[] {
-  return readingsHistory.get(stationId) || [];
+  // Sync version used directly by poll logic
+  return [];
 }
 
-export function getAnomalyEvents(): AnomalyEvent[] { return anomalyEvents; }
+export async function fetchAnomalyEvents(): Promise<AnomalyEvent[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/events`);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch anomaly events:', err);
+    return [];
+  }
+}
+
+export function getAnomalyEvents(): AnomalyEvent[] {
+  return [];
+}
 
 export function getLatestReading(stationId: string): Reading | null {
-  return latestReadings.get(stationId) ?? null;
+  return latestReadingsCache.get(stationId) ?? null;
 }
 
-export function triggerFault(stationId: string, type: FaultType): void {
-  activeFaults.set(stationId, {
-    type,
-    startTime: Date.now(),
-    duration: 9000 + Math.random() * 4000,
-  });
+export async function triggerFault(stationId: string, type: FaultType): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/stations/${stationId}/fault`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type })
+    });
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+  } catch (err) {
+    console.error(`Failed to trigger fault ${type} on station ${stationId}:`, err);
+  }
+}
+
+export async function fetchNetworkHealth(): Promise<number> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/network-health`);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch network health:', err);
+    return 100;
+  }
 }
 
 export function getNetworkHealth(): number {
-  const faultCount = activeFaults.size;
-  const total = STATIONS.length;
-  return Math.max(0, Math.round(((total - faultCount) / total) * 100));
+  return 100;
+}
+
+export async function fetchStationStatus(stationId: string): Promise<StationStatus> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/stations/${stationId}/status`);
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error(`Failed to fetch station status for ${stationId}:`, err);
+    return 'normal';
+  }
 }
 
 export function getStationStatus(stationId: string): StationStatus {
-  const fault = activeFaults.get(stationId);
-  if (!fault) return 'normal';
-  if (fault.type === 'dropout') return 'offline';
-  if (fault.type === 'spike') return 'critical';
-  return 'warning';
+  return 'normal';
 }
