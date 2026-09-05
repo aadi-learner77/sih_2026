@@ -10,14 +10,21 @@
 ### 1. Live Weather Station Network & Cyberpunk Dashboard
 ![SkyGuard AI Live Dashboard](./assets/dashboard_normal.png)
 
-*Figure 1: Operational overview of 15 Indian Automatic Weather Stations (AWS). Displays live telemetry metrics (Temperature, Pressure, Humidity, Wind), real-time 60-point time-series telemetry charts, 100% network health status, and the interactive D3 Mercator India spatial map with official state and district boundaries.*
+*Figure 1: Operational overview of 15 Indian Automatic Weather Stations (AWS). Displays live telemetry metrics (Temperature, Pressure, Humidity, Wind), real-time 60-point time-series telemetry charts, 100% network health status, and the interactive D3 Mercator India spatial map.*
 
 ---
 
-### 2. Real-Time Anomaly Detection & Self-Healing Engine
+### 2. High-Resolution District-Level Spatial Boundaries Layer (~760 Districts)
+![SkyGuard AI District Boundaries Layer](./assets/dashboard_districts.png)
+
+*Figure 2: Spatial boundary visualization showing the toggleable district boundaries mesh (`DISTRICTS ON/OFF`). Over 760 internal district polygon paths rendered with vector strokes, enabling fine-grained geographical telemetry tracking across all 35 Indian States & Union Territories.*
+
+---
+
+### 3. Real-Time Anomaly Detection & Self-Healing Fault Simulator
 ![SkyGuard AI Anomaly Detection & Self-Healing](./assets/dashboard_anomaly_detection.png)
 
-*Figure 2: Real-time response to an injected sensor fault (`spike` fault on `AWS-DEL-01`). The dual-layer detection pipeline flags the anomaly in real time (AI Confidence: 77%), pulses a critical red alert on the geospatial map, logs the event, and automatically triggers value imputation (`77.5°C ➔ 79.6°C / Baseline Interpolation`).*
+*Figure 3: Live response to an injected sensor fault simulation (`spike` / `flatline` fault on `AWS-DEL-01`). The dual-layer detection pipeline flags anomalies in real time (AI Confidence: 97%), logs event history, updates critical network health indicators, and automatically performs value imputation.*
 
 ---
 
@@ -128,6 +135,7 @@ graph TD
 SIH_2k26/
 ├── assets/                                 # Screenshots & Media Artifacts
 │   ├── dashboard_normal.png
+│   ├── dashboard_districts.png
 │   └── dashboard_anomaly_detection.png
 ├── backend/                                # FastAPI & Scikit-Learn Backend Service
 │   ├── app/
