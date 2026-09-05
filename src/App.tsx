@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as DS from './services/dataService';
 import type { Station, Reading, AnomalyEvent, FaultType, DetectionMode } from './services/dataService';
+import IndiaMap from './components/IndiaMap';
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
 const CLR = {
@@ -24,19 +25,7 @@ function statusGlow(s: string) {
   return 'glow-blue';
 }
 
-// India SVG map helpers (viewBox 0 0 400 500)
-function mapX(lon: number) { return (lon - 68) / 30 * 380 + 10; }
-function mapY(lat: number) { return (37 - lat) / 30 * 480 + 10; }
 
-const INDIA_PATH =
-  'M 12.5,226 L 29,202 L 41.7,154 L 54.3,122 L 67,66 L 86,50 L 92.3,34 L 105,18 ' +
-  'L 124,10 L 143,34 L 162,50 L 187.3,106 L 212.7,146 L 232,162 L 251,162 ' +
-  'L 270,170 L 276.4,170 L 289,170 L 314.7,162 L 333.4,178 L 346,170 L 364.7,162 ' +
-  'L 377.3,170 L 377.3,202 L 364.7,218 L 352,234 L 339.3,226 L 326.7,210 ' +
-  'L 307.7,186 L 295,210 L 289,234 L 276.4,234 L 270,226 L 263.3,242 ' +
-  'L 251,274 L 238.4,290 L 225.3,306 L 212.7,338 L 200,378 L 168,394 ' +
-  'L 162,434 L 155.3,450 L 136.7,458 L 130.3,463 L 117.7,450 L 98.7,418 ' +
-  'L 92.3,354 L 79.7,330 L 67,306 L 70.8,274 L 48,258 L 35.3,234 L 16.3,218 Z';
 
 // ─── ParticleBackground ───────────────────────────────────────────────────────
 function ParticleBackground() {
@@ -252,65 +241,7 @@ function ArcGauge({
   );
 }
 
-// ─── IndiaMap ─────────────────────────────────────────────────────────────────
-function IndiaMap({
-  stations, statuses, latest, selected, onSelect,
-}: {
-  stations: Station[]; statuses: Record<string, DS.StationStatus>;
-  latest: Record<string, Reading | null>; selected: string; onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="relative w-full h-full flex items-center justify-center p-4">
-      <svg viewBox="0 0 400 500" className="max-h-full max-w-full" style={{ filter: 'drop-shadow(0 0 30px rgba(0,212,255,0.06))' }}>
-        {/* India outline */}
-        <path d={INDIA_PATH}
-          fill="rgba(0,212,255,0.04)"
-          stroke="rgba(0,212,255,0.22)"
-          strokeWidth={1.2}
-          strokeLinejoin="round" />
-        {/* Station pins */}
-        {stations.map(s => {
-          const x = mapX(s.lon);
-          const y = mapY(s.lat);
-          const st = statuses[s.id] || 'normal';
-          const color = statusColor(st);
-          const isSelected = s.id === selected;
-          const r = isSelected ? 5.5 : 4;
-          return (
-            <g key={s.id} style={{ cursor: 'pointer' }} onClick={() => onSelect(s.id)}>
-              {/* Pulse rings */}
-              <circle cx={x} cy={y} r={r + 4} fill={color} opacity={0} className="pin-pulse"
-                style={{ transformOrigin: `${x}px ${y}px` }} />
-              {st !== 'normal' && (
-                <circle cx={x} cy={y} r={r + 8} fill={color} opacity={0} className="pin-pulse-slow"
-                  style={{ transformOrigin: `${x}px ${y}px` }} />
-              )}
-              {/* Pin */}
-              <circle cx={x} cy={y} r={r} fill={color}
-                stroke={isSelected ? 'white' : 'rgba(0,0,0,0.4)'} strokeWidth={isSelected ? 1.5 : 0.8}
-                style={{ filter: `drop-shadow(0 0 ${isSelected ? 10 : 6}px ${color})`,
-                  transition: 'r 0.2s ease' }} />
-              {/* Label for selected */}
-              {isSelected && (
-                <text x={x + 8} y={y + 4}
-                  style={{ fontSize: 9, fill: color, fontFamily: "'JetBrains Mono'", fontWeight: 600 }}>
-                  {s.name}
-                </text>
-              )}
-            </g>
-          );
-        })}
-        {/* Legend */}
-        {([['NORMAL', CLR.green], ['WARNING', CLR.amber], ['CRITICAL', CLR.red]] as const).map(([label, color], i) => (
-          <g key={label} transform={`translate(8, ${460 + i * 13})`}>
-            <circle cx={4} cy={4} r={3} fill={color} />
-            <text x={12} y={8} style={{ fontSize: 8, fill: 'rgba(200,216,240,0.45)', fontFamily: 'Inter' }}>{label}</text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
+
 
 // ─── EventCard ────────────────────────────────────────────────────────────────
 function EventCard({ event, showAiOnly }: { event: AnomalyEvent; showAiOnly: boolean }) {
