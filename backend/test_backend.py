@@ -25,8 +25,9 @@ def run_tests():
     print("=" * 70)
 
     station_id = "DEL"
+    from app.generator import get_base_for_station
     del_base_temp = BASE_VALUES["DEL"]["temp"]
-    del_base_pres = BASE_VALUES["DEL"]["pressure"]
+    del_base_pres = get_base_for_station(station_id)["pressure"]
 
     # ── Test 1: Normal Reading (Condition a) ──────────────────────────────────
     print("\n[TEST 1] Testing Normal Reading (Condition a)...")

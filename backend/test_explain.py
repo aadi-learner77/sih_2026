@@ -77,7 +77,7 @@ def test_caching():
 
     assert result1 == result2
     print(f"Cached explanation: {result1}")
-    print("  ✓ Caching test passed!")
+    print("  [PASS] Caching test passed!")
 
 if __name__ == "__main__":
     print("=" * 60)
