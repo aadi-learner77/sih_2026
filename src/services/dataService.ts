@@ -1,4 +1,5 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
+// Shared model types for stations, telemetry readings, anomaly events, and fault actions.
 
 export type StationStatus = 'normal' | 'warning' | 'critical' | 'offline';
 

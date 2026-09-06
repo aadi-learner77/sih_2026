@@ -12,6 +12,7 @@ from app.generator import generate_raw_reading
 from app.detector import detector_instance
 from app.state import state
 
+# FastAPI app startup initializes the weather station history used by the anomaly detector.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Seed initial normal readings history for all stations
